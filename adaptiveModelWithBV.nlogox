@@ -84,8 +84,8 @@ to go
 
   ifelse adaptive-therapy [
     set drugMolecule 0
-    ; sensitive count > burden threshold
-    if c1count > adaptive-burden-threshold and ticks mod 7 = 0  and count drugts < max-drug [
+    ; total tissue burden (sensitive + resistant, excluding cells that invaded the vessel) > burden threshold
+    if c1count + c2count > adaptive-burden-threshold and ticks mod 7 = 0  and count drugts < max-drug [
       giveDrugs bolusAmount
     ]
   ]
