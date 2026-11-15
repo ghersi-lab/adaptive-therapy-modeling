@@ -94,7 +94,7 @@ to go
       giveDrugs bolusAmount
       set bolusTick -1
     ]
-    if ticks > startTime and ( ticks - startTime ) mod timeInterval = 0 [
+    if ticks >= startTime and ( ticks - startTime ) mod timeInterval = 0 [
       giveDrugs drugMolecule
     ]
   ]
