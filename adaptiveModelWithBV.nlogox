@@ -137,6 +137,8 @@ to go
   ]
 
   ask drugts [
+    ; drug decay: each molecule is removed with probability drug-decayP per tick (half-life ~ ln 2 / drug-decayP)
+    if random-float 1 < drug-decayP [ die ]
     ;if count neighbors with [count drugts-here = 0] != 0 [
       move-to one-of neighbors with [ not is-blood-vessel? ];with [count drugts-here = 0]
     ;]
@@ -240,6 +242,7 @@ end]]></code>
     <slider x="15" step="0.005" y="407" max="0.2" width="196" display="proliferationP-PRO" height="50" min="0" direction="Horizontal" default="0.05" variable="proliferationP-PRO"></slider>
     <slider x="15" step="0.1" y="352" max="1" width="195" display="PRO-to-DP" height="50" min="0" direction="Horizontal" default="0.5" variable="PRO-to-DP"></slider>
     <input x="16" multiline="false" y="283" height="60" variable="cell-count" type="number" width="197">100.0</input>
+    <slider x="16" step="0.001" y="173" max="0.1" width="196" display="drug-decayP" height="50" min="0" direction="Horizontal" default="0.0" variable="drug-decayP"></slider>
     <slider x="16" step="0.005" y="228" max="0.2" width="196" display="deathP" height="50" min="0" direction="Horizontal" default="0.04" variable="deathP"></slider>
     <chooser x="15" y="53" height="60" variable="blood-vessel-width" current="1" width="198" display="blood-vessel-width">
       <choice type="double" value="0.0"></choice>
@@ -264,6 +267,8 @@ Cell types (patch colors):
  - Red: vessel patches invaded by resistant cells
 
 The invading-cells chooser sets which cells can invade the vessel: "resistant only" (default) or "all". Invasion succeeds with probability invasionP-DP per attempt, for either cell type; sensitive-invasions counts the invasions by sensitive cells. The run stops when total-invasion reaches invasion-threshold, when the tumor burden exceeds tumor-burden-threshold, or when the tumor is eliminated.
+
+Drug molecules random-walk through the tissue; they are removed when they kill a sensitive cell, when they reach the tissue border, or by decay with probability drug-decayP per tick.
 
 In adaptive mode, a bolus of bolusAmount is given every 7 ticks while the tissue tumor burden (sensitive + resistant cells) exceeds adaptive-burden-threshold and fewer than max-drug drug molecules are present.
 
