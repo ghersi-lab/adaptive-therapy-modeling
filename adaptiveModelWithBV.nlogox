@@ -4,13 +4,19 @@
 ;; is a per-tick death probability (deathP). A blood vessel on the right edge can be invaded.
 breed [ drugts drugt ]
 patches-own [ is-tumor? just-died? is-blood-vessel?]
-globals [tumor-burden tumor-burden-threshold bolusTick c1count c2count total-drug total-invasion sensitive-invasions]
+globals [tumor-burden tumor-burden-threshold bolusTick c1count c2count total-drug total-invasion sensitive-invasions
+         diagnosis-tick outcome]
 
 
 to setup
   clear-all
   set total-invasion 0
   set sensitive-invasions 0
+  ; diagnosis-tick: first tick the tissue burden exceeds adaptive-burden-threshold (-1 = not yet)
+  set diagnosis-tick -1
+  ; outcome: "alive" while running (or when a run is cut off by a time limit), then
+  ; "invasion", "burden" or "eradicated" when the model stops
+  set outcome "alive"
   ;let ccount 1
   ; size of the tumor growing space doesn't go smaller when blood vessel is added
   resize-world min-pxcor (max-pycor + blood-vessel-width)  min-pycor max-pycor
@@ -85,25 +91,29 @@ to go
   set tumor-burden count patches with [ is-tumor? ]
   set c1count count patches with [pcolor = orange]
   set c2count count patches with [pcolor = black]
-  if tumor-burden > tumor-burden-threshold or tumor-burden = 0 or total-invasion >= invasion-threshold [ stop ]
+  if total-invasion >= invasion-threshold [ set outcome "invasion" stop ]
+  if tumor-burden > tumor-burden-threshold [ set outcome "burden" stop ]
+  if tumor-burden = 0 [ set outcome "eradicated" stop ]
 
-  ; every 7th tick give bolus if tumor-burden is high
+  ; tissue burden: sensitive + resistant cells, excluding cells that invaded the vessel
+  let tissue-burden c1count + c2count
+  ; diagnosis: MTD and adaptive therapy start the first tick the tissue burden exceeds the threshold
+  if diagnosis-tick = -1 and tissue-burden > adaptive-burden-threshold [ set diagnosis-tick ticks ]
+  ; MTD and adaptive dose every 7 ticks counted from diagnosis, unless max-drug molecules are present
+  let dose-day? diagnosis-tick >= 0 and (ticks - diagnosis-tick) mod 7 = 0 and count drugts < max-drug
 
-  ifelse adaptive-therapy [
-    ; total tissue burden (sensitive + resistant, excluding cells that invaded the vessel) > burden threshold
-    if c1count + c2count > adaptive-burden-threshold and ticks mod 7 = 0  and count drugts < max-drug [
-      giveDrugs bolusAmount
-    ]
+  ; therapy: "none", "MTD" (never pauses), "adaptive" (pauses while burden is at or below
+  ; adaptive-burden-threshold), "schedule" (drugMolecule every timeInterval ticks from startTime)
+  if therapy = "MTD" and dose-day? [ giveDrugs bolusAmount ]
+  if therapy = "adaptive" and dose-day? and tissue-burden > adaptive-burden-threshold [ giveDrugs bolusAmount ]
+  if therapy = "schedule" and ticks >= startTime and ( ticks - startTime ) mod timeInterval = 0 [
+    giveDrugs drugMolecule
   ]
-  [
-    ; one-off manual bolus scheduled with the BOLUS button (bolusTick = -1 means none pending)
-    if ticks = bolusTick [
-      giveDrugs bolusAmount
-      set bolusTick -1
-    ]
-    if ticks >= startTime and ( ticks - startTime ) mod timeInterval = 0 [
-      giveDrugs drugMolecule
-    ]
+
+  ; one-off manual bolus scheduled with the BOLUS button, in any therapy mode (-1 = none pending)
+  if ticks = bolusTick [
+    giveDrugs bolusAmount
+    set bolusTick -1
   ]
 
   ;for clones
@@ -228,19 +238,26 @@ end]]></code>
     <monitor x="1065" precision="17" y="603" height="60" fontSize="11" width="100">total-drug</monitor>
     <monitor x="1179" precision="17" y="605" height="60" fontSize="11" width="161">total-invasion</monitor>
     <monitor x="1345" precision="17" y="605" height="60" fontSize="11" width="161">sensitive-invasions</monitor>
-    <slider x="14" step="1" y="754" max="20" width="197" display="invasion-threshold" height="50" min="0" direction="Horizontal" default="5.0" variable="invasion-threshold"></slider>
-    <chooser x="14" y="809" height="60" variable="invading-cells" current="0" width="197" display="invading-cells">
+    <monitor x="1065" precision="17" y="670" height="60" fontSize="11" width="100">outcome</monitor>
+    <monitor x="1179" precision="17" y="670" height="60" fontSize="11" width="161">diagnosis-tick</monitor>
+    <slider x="14" step="1" y="774" max="20" width="197" display="invasion-threshold" height="50" min="0" direction="Horizontal" default="5.0" variable="invasion-threshold"></slider>
+    <chooser x="14" y="829" height="60" variable="invading-cells" current="0" width="197" display="invading-cells">
       <choice type="string" value="resistant only"></choice>
       <choice type="string" value="all"></choice>
     </chooser>
-    <chooser x="14" y="874" height="60" variable="initial-layout" current="0" width="197" display="initial-layout">
+    <chooser x="14" y="894" height="60" variable="initial-layout" current="0" width="197" display="initial-layout">
       <choice type="string" value="clustered"></choice>
       <choice type="string" value="mixed"></choice>
     </chooser>
-    <input x="14" multiline="false" y="689" height="60" variable="max-drug" type="number" width="197">2600.0</input>
+    <input x="14" multiline="false" y="709" height="60" variable="max-drug" type="number" width="197">2600.0</input>
     <slider x="15" step="0.1" y="517" max="1" width="196" display="invasionP-DP" height="50" min="0" direction="Horizontal" default="0.6" variable="invasionP-DP"></slider>
-    <switch x="15" y="579" height="40" on="false" variable="adaptive-therapy" width="195" display="adaptive-therapy"></switch>
-    <input x="14" multiline="false" y="624" height="60" variable="adaptive-burden-threshold" type="number" width="196">2000.0</input>
+    <chooser x="15" y="579" height="60" variable="therapy" current="0" width="195" display="therapy">
+      <choice type="string" value="none"></choice>
+      <choice type="string" value="MTD"></choice>
+      <choice type="string" value="adaptive"></choice>
+      <choice type="string" value="schedule"></choice>
+    </chooser>
+    <input x="14" multiline="false" y="644" height="60" variable="adaptive-burden-threshold" type="number" width="196">2000.0</input>
     <slider x="15" step="0.005" y="462" max="0.2" width="196" display="proliferationP-DP" height="50" min="0" direction="Horizontal" default="0.045" variable="proliferationP-DP"></slider>
     <slider x="15" step="0.005" y="407" max="0.2" width="196" display="proliferationP-PRO" height="50" min="0" direction="Horizontal" default="0.05" variable="proliferationP-PRO"></slider>
     <slider x="15" step="0.1" y="352" max="1" width="195" display="PRO-to-DP" height="50" min="0" direction="Horizontal" default="0.5" variable="PRO-to-DP"></slider>
@@ -273,7 +290,15 @@ The invading-cells chooser sets which cells can invade the vessel: "resistant on
 
 Drug molecules are added at random tissue patches and random-walk through the tissue. All borders, including the vessel wall, are reflecting: a move that would leave the tissue is skipped. Molecules are removed only when they kill a sensitive cell or by decay, with probability drug-decayP per tick (half-life about ln 2 / drug-decayP ticks).
 
-In adaptive mode, a bolus of bolusAmount is given every 7 ticks while the tissue tumor burden (sensitive + resistant cells) exceeds adaptive-burden-threshold and fewer than max-drug drug molecules are present.
+The therapy chooser selects the treatment:
+ - none: no drug (the BOLUS button still works)
+ - MTD: a bolus of bolusAmount every 7 ticks from diagnosis, never paused
+ - adaptive: the same doses, but each one is skipped while the tissue burden is at or below adaptive-burden-threshold
+ - schedule: drugMolecule molecules every timeInterval ticks from startTime
+
+Diagnosis (diagnosis-tick) is the first tick the tissue burden (sensitive + resistant cells, excluding cells inside the vessel) exceeds adaptive-burden-threshold; MTD and adaptive therapy both start then. In both, a dose is skipped while max-drug or more drug molecules are present (the toxicity limit).
+
+When the model stops, outcome records why: "invasion" (total-invasion reached invasion-threshold), "burden" (tumor burden exceeded tumor-burden-threshold) or "eradicated". Runs cut off by a BehaviorSpace time limit keep outcome "alive".
 
 ## HOW TO USE IT
 
@@ -1261,8 +1286,8 @@ Note the growth represented in the adjoining graph. The plot reports the followi
         <enumeratedValueSet variable="PRO-to-DP">
           <value value="0.5"></value>
         </enumeratedValueSet>
-        <enumeratedValueSet variable="adaptive-therapy">
-          <value value="true"></value>
+        <enumeratedValueSet variable="therapy">
+          <value value="&quot;adaptive&quot;"></value>
         </enumeratedValueSet>
         <steppedValueSet variable="bolusAmount" first="100" step="100" last="500"></steppedValueSet>
         <steppedValueSet variable="adaptive-burden-threshold" first="2000" step="500" last="3000"></steppedValueSet>
