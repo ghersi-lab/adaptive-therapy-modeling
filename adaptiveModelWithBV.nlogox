@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <model version="NetLogo 7.0.3" snapToGrid="false">
-  <code><![CDATA[;;assuming patch getting resource in last tick is still eligible for next one
-;;random patches get the resource
+  <code><![CDATA[;; Spatial adaptive-therapy model: sensitive and resistant cells compete for space; cell turnover
+;; is a per-tick death probability (deathP). A blood vessel on the right edge can be invaded.
 breed [ drugts drugt ]
-breed [ resourcets resourcet ]
-patches-own [ is-tumor? starved-for just-died? is-blood-vessel?]
+patches-own [ is-tumor? just-died? is-blood-vessel?]
 globals [tumor-burden tumor-burden-threshold bolusTick c1count c2count total-drug total-invasion sensitive-invasions]
 
 
@@ -32,14 +31,6 @@ to setup
   ask patches with [pxcor > (max-pxcor - blood-vessel-width)] [
     set is-blood-vessel? true
     set pcolor pink
-  ]
-
-  ;create resource resourcets of resource
-  ask n-of resource patches with [not is-blood-vessel?] [
-    sprout-resourcets 1 [
-    set shape "food"
-    set color green
-    set size 1]
   ]
 
   ; with no cells there is nothing to simulate; reset-ticks so that go stops cleanly instead of erroring
@@ -105,21 +96,11 @@ to go
 
     set just-died? false
 
-    ;for clones with resource
-    ifelse count resourcets-here = 1 [
-      ask resourcets-here [die]
-      set starved-for 0
-
-    ]
-    ;else part for clones without resource
-    [
-      if starved-for != -1 [ set starved-for starved-for + 1 ]
-      if starved-for > starvingThreshold [
-        set pcolor white
-        set just-died? true
-        set is-tumor? false
-      ]
-
+    ; natural turnover: same per-tick death probability for both cell types
+    if random-float 1 < deathP [
+      set pcolor white
+      set just-died? true
+      set is-tumor? false
     ]
 
     ;drug sensitive vs. drug resistant
@@ -140,32 +121,11 @@ to go
     ]
   ]
 
-  ask resourcets [
-    if any? neighbors with [count resourcets-here = 0 and not is-blood-vessel? ] [move-to one-of neighbors with [count resourcets-here = 0 and not is-blood-vessel? ]]
-  ]
-
-
-
   ask drugts [
     ;if count neighbors with [count drugts-here = 0] != 0 [
       move-to one-of neighbors with [ not is-blood-vessel? ];with [count drugts-here = 0]
     ;]
     if round abs xcor = max-pxcor - blood-vessel-width or round abs ycor = max-pycor  [die]
-  ]
-
-
-  let resourcet-consumed resource - count resourcets
-
-  let m min list resourcet-consumed resourceRate
-
-  ;assuming patch getting resource in last tick is still eligible for next one
-  ;again random patches get the resource
-  ask n-of m patches with [count resourcets-here = 0 and not is-blood-vessel? ] [
-    sprout-resourcets 1 [
-      set shape "food"
-      set color green
-      set size 1
-    ]
   ]
 
   tick
@@ -188,7 +148,7 @@ to replicate [col]
   ; tissue patch (white) or an uninvaded vessel patch (pink); other cells target white patches only.
   ; A vessel patch is invaded with probability invasionP-DP (the same for both cell types);
   ; invaded patches turn red and are counted in total-invasion. Red cells are not updated afterwards
-  ; (go skips vessel patches), so they neither divide nor starve.
+  ; (go skips vessel patches), so they neither divide nor die.
   let can-invade? col = black or invading-cells = "all"
   let target ifelse-value can-invade?
     [ one-of neighbors with [pcolor = white or pcolor = pink] ]
@@ -215,13 +175,11 @@ end
 to initiate-new [col]
   set pcolor col
   set is-tumor? true
-  ifelse col = red [set starved-for -1][set starved-for 0]
 end]]></code>
   <widgets>
     <view x="311" wrappingAllowedX="false" y="54" frameRate="30.0" minPycor="-49" height="598" showTickCounter="true" patchSize="6.0" fontSize="10" wrappingAllowedY="false" width="658" tickCounterLabel="ticks" maxPycor="49" updateMode="1" maxPxcor="59" minPxcor="-49"></view>
     <button x="77" y="10" height="40" disableUntilTicks="false" forever="true" kind="Observer" width="63" display="go">go</button>
     <monitor x="1336" precision="17" y="215" height="60" fontSize="11" width="103" display="drugMolecule">count drugts</monitor>
-    <monitor x="1335" precision="17" y="146" height="60" fontSize="11" width="104" display="resources">count resourcets</monitor>
     <plot x="1063" autoPlotX="true" yMax="10.0" autoPlotY="true" y="286" xMin="0.0" height="302" legend="true" xMax="10.0" yMin="0.0" width="391" display="counts">
       <setup></setup>
       <update></update>
@@ -236,10 +194,6 @@ end]]></code>
       <pen interval="1.0" mode="0" display="DPCount" color="-16777216" legend="true">
         <setup></setup>
         <update>plot count patches with [pcolor = black]</update>
-      </pen>
-      <pen interval="1.0" mode="0" display="resourceCount" color="-13840069" legend="true">
-        <setup></setup>
-        <update>plot count resourcets</update>
       </pen>
     </plot>
     <button x="143" y="10" height="40" disableUntilTicks="false" forever="false" kind="Observer" width="81" display="step-go">go</button>
@@ -267,9 +221,7 @@ end]]></code>
     <slider x="15" step="0.005" y="407" max="0.2" width="196" display="proliferationP-PRO" height="50" min="0" direction="Horizontal" default="0.05" variable="proliferationP-PRO"></slider>
     <slider x="15" step="0.1" y="352" max="1" width="195" display="PRO-to-DP" height="50" min="0" direction="Horizontal" default="0.5" variable="PRO-to-DP"></slider>
     <input x="16" multiline="false" y="283" height="60" variable="cell-count" type="number" width="197">100.0</input>
-    <slider x="16" step="1" y="228" max="100" width="196" display="starvingThreshold" height="50" min="0" direction="Horizontal" default="25.0" variable="starvingThreshold"></slider>
-    <slider x="16" step="1" y="173" max="100" width="196" display="resourceRate" height="50" min="0" direction="Horizontal" default="10.0" variable="resourceRate"></slider>
-    <slider x="16" step="1" y="118" max="100" width="196" display="resource" height="50" min="0" direction="Horizontal" default="10.0" variable="resource"></slider>
+    <slider x="16" step="0.005" y="228" max="0.2" width="196" display="deathP" height="50" min="0" direction="Horizontal" default="0.04" variable="deathP"></slider>
     <chooser x="15" y="53" height="60" variable="blood-vessel-width" current="1" width="198" display="blood-vessel-width">
       <choice type="double" value="0.0"></choice>
       <choice type="double" value="10.0"></choice>
@@ -282,7 +234,7 @@ Modeling tumor growth with adaptive therapy
 
 ## HOW IT WORKS
 
-Creates sensitive and resistant clone with given number of cells. The cancer cells grow with the availability of resources and starvation time. The drug can be added into the environment metronomically, adaptively, or manually with a button.
+Creates sensitive and resistant clone with given number of cells. Cells compete for space: a cell can divide (probability proliferationP-PRO for sensitive, proliferationP-DP for resistant cells) only into an empty neighboring patch. Every cell dies with probability deathP per tick (turnover), freeing space. The drug can be added into the environment metronomically, adaptively, or manually with a button.
 
 Cell types (patch colors):
  - Orange: drug-sensitive cells (PRO); killed on contact with a drug molecule
@@ -307,7 +259,6 @@ Click on BOLUS to manually add drug
 Note the growth represented in the adjoining graph. The plot reports the following
  - Sensitive cell count (orange line, PROCount)
  - Resistant cell count (black line, DPCount)
- - Number of resources  (green line) and 
  - Number of drug molecules (blue line)
 
 
@@ -1264,15 +1215,6 @@ Note the growth represented in the adjoining graph. The plot reports the followi
         <metric>total-drug</metric>
       </metrics>
       <constants>
-        <enumeratedValueSet variable="resourceRate">
-          <value value="10"></value>
-        </enumeratedValueSet>
-        <enumeratedValueSet variable="resource">
-          <value value="10"></value>
-        </enumeratedValueSet>
-        <enumeratedValueSet variable="starvingThreshold">
-          <value value="25"></value>
-        </enumeratedValueSet>
         <enumeratedValueSet variable="cell-count">
           <value value="100"></value>
         </enumeratedValueSet>
