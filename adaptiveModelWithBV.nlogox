@@ -5,12 +5,13 @@
 breed [ drugts drugt ]
 breed [ resourcets resourcet ]
 patches-own [ is-tumor? starved-for just-died? is-blood-vessel?]
-globals [tumor-burden tumor-burden-threshold bolusTick c1count c2count total-drug total-invasion]
+globals [tumor-burden tumor-burden-threshold bolusTick c1count c2count total-drug total-invasion sensitive-invasions]
 
 
 to setup
   clear-all
   set total-invasion 0
+  set sensitive-invasions 0
   ;let ccount 1
   ; size of the tumor growing space doesn't go smaller when blood vessel is added
   resize-world min-pxcor (max-pycor + blood-vessel-width)  min-pycor max-pycor
@@ -183,38 +184,32 @@ to giveDrugs [dm]
 end
 
 to replicate [col]
-  ifelse col = orange [
-    let nc count neighbors with [pcolor = white]
-    if nc > 0 [
-      ask one-of neighbors with [pcolor = white] [
-        initiate-new col
-      ]
-    ]
-  ]
-  ; else part for col = black (resistant): the daughter may target an empty tissue patch (white)
-  ; or an uninvaded vessel patch (pink). A vessel patch is invaded with probability invasionP-DP;
+  ; Cells that can invade (set by invading-cells: resistant only, or all) may target an empty
+  ; tissue patch (white) or an uninvaded vessel patch (pink); other cells target white patches only.
+  ; A vessel patch is invaded with probability invasionP-DP (the same for both cell types);
   ; invaded patches turn red and are counted in total-invasion. Red cells are not updated afterwards
   ; (go skips vessel patches), so they neither divide nor starve.
-  [
-    let target one-of neighbors with [pcolor = white or pcolor = pink]
-    if target != nobody [
-      ifelse [pcolor] of target = pink [
-        ifelse random-float 1 < invasionP-DP [
-          set total-invasion total-invasion + 1
-          ask target [ initiate-new red ]
-        ]
-        [
-          ; invasion failed: the daughter goes to a free tissue neighbor of the parent instead
-          let free one-of neighbors with [pcolor = white]
-          if free != nobody [ ask free [ initiate-new col ] ]
-        ]
+  let can-invade? col = black or invading-cells = "all"
+  let target ifelse-value can-invade?
+    [ one-of neighbors with [pcolor = white or pcolor = pink] ]
+    [ one-of neighbors with [pcolor = white] ]
+  if target != nobody [
+    ifelse [pcolor] of target = pink [
+      ifelse random-float 1 < invasionP-DP [
+        set total-invasion total-invasion + 1
+        if col = orange [ set sensitive-invasions sensitive-invasions + 1 ]
+        ask target [ initiate-new red ]
       ]
       [
-        ask target [ initiate-new col ]
+        ; invasion failed: the daughter goes to a free tissue neighbor of the parent instead
+        let free one-of neighbors with [pcolor = white]
+        if free != nobody [ ask free [ initiate-new col ] ]
       ]
     ]
+    [
+      ask target [ initiate-new col ]
+    ]
   ]
-
 end
 
 to initiate-new [col]
@@ -258,7 +253,12 @@ end]]></code>
     <input x="1071" multiline="false" y="85" height="60" variable="startTime" type="number" width="148">100.0</input>
     <monitor x="1065" precision="17" y="603" height="60" fontSize="11" width="100">total-drug</monitor>
     <monitor x="1179" precision="17" y="605" height="60" fontSize="11" width="161">total-invasion</monitor>
+    <monitor x="1345" precision="17" y="605" height="60" fontSize="11" width="161">sensitive-invasions</monitor>
     <slider x="14" step="1" y="754" max="20" width="197" display="invasion-threshold" height="50" min="0" direction="Horizontal" default="5.0" variable="invasion-threshold"></slider>
+    <chooser x="14" y="809" height="60" variable="invading-cells" current="0" width="197" display="invading-cells">
+      <choice type="string" value="resistant only"></choice>
+      <choice type="string" value="all"></choice>
+    </chooser>
     <input x="14" multiline="false" y="689" height="60" variable="max-drug" type="number" width="197">2600.0</input>
     <slider x="15" step="0.1" y="517" max="1" width="196" display="invasionP-DP" height="50" min="0" direction="Horizontal" default="0.6" variable="invasionP-DP"></slider>
     <switch x="15" y="579" height="40" on="false" variable="adaptive-therapy" width="195" display="adaptive-therapy"></switch>
@@ -290,7 +290,7 @@ Cell types (patch colors):
  - Pink: blood vessel (right edge, width set by blood-vessel-width)
  - Red: vessel patches invaded by resistant cells
 
-Only resistant cells can invade the vessel, with probability invasionP-DP per attempt. The run stops when total-invasion reaches invasion-threshold, when the tumor burden exceeds tumor-burden-threshold, or when the tumor is eliminated.
+The invading-cells chooser sets which cells can invade the vessel: "resistant only" (default) or "all". Invasion succeeds with probability invasionP-DP per attempt, for either cell type; sensitive-invasions counts the invasions by sensitive cells. The run stops when total-invasion reaches invasion-threshold, when the tumor burden exceeds tumor-burden-threshold, or when the tumor is eliminated.
 
 In adaptive mode, a bolus of bolusAmount is given every 7 ticks while the tissue tumor burden (sensitive + resistant cells) exceeds adaptive-burden-threshold and fewer than max-drug drug molecules are present.
 
