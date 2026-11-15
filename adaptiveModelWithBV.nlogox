@@ -20,7 +20,7 @@ to setup
   let rcount cell-count - scount
   set tumor-burden-threshold max-pycor * (max-pxcor - blood-vessel-width) * pi * 0.9
   ;clones should be at the center
-  set bolusTick 0
+  set bolusTick -1
   ;set drugMolecule 0
   ;random-seed 100
   ; make everything from black to white
@@ -90,13 +90,13 @@ to go
     ]
   ]
   [
-    ifelse bolusTick > 0 and ticks mod bolusTick = 0 [
+    ; one-off manual bolus scheduled with the BOLUS button (bolusTick = -1 means none pending)
+    if ticks = bolusTick [
       giveDrugs bolusAmount
+      set bolusTick -1
     ]
-    [
-      if ticks > startTime and ( ticks - startTime ) mod timeInterval = 0 [
-        giveDrugs drugMolecule
-      ]
+    if ticks > startTime and ( ticks - startTime ) mod timeInterval = 0 [
+      giveDrugs drugMolecule
     ]
   ]
 
