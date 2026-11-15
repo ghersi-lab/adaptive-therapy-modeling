@@ -51,8 +51,23 @@ to setup
     ]
   ]
 
-  ask n-of scount patches with [ is-tumor? ] [ set pcolor orange ]
-  ask patches with [pcolor = blue] [ set pcolor black ]
+  ; assign cell types within the tumor (blue = not yet assigned)
+  ifelse initial-layout = "mixed" [
+    ; mixed: cell types scattered at random through the tumor
+    ask n-of scount patches with [ is-tumor? ] [ set pcolor orange ]
+    ask patches with [pcolor = blue] [ set pcolor black ]
+  ]
+  [
+    ; clustered: resistant cells form one contiguous patch inside the tumor, grown from a random
+    ; seed cell; the remaining tumor cells are sensitive
+    if rcount > 0 [
+      ask one-of patches with [pcolor = blue] [ set pcolor black ]
+      while [ count patches with [pcolor = black] < rcount ] [
+        ask one-of patches with [pcolor = blue and any? neighbors with [pcolor = black]] [ set pcolor black ]
+      ]
+    ]
+    ask patches with [pcolor = blue] [ set pcolor orange ]
+  ]
 
 
   set c1count scount
@@ -213,6 +228,10 @@ end]]></code>
       <choice type="string" value="resistant only"></choice>
       <choice type="string" value="all"></choice>
     </chooser>
+    <chooser x="14" y="874" height="60" variable="initial-layout" current="0" width="197" display="initial-layout">
+      <choice type="string" value="clustered"></choice>
+      <choice type="string" value="mixed"></choice>
+    </chooser>
     <input x="14" multiline="false" y="689" height="60" variable="max-drug" type="number" width="197">2600.0</input>
     <slider x="15" step="0.1" y="517" max="1" width="196" display="invasionP-DP" height="50" min="0" direction="Horizontal" default="0.6" variable="invasionP-DP"></slider>
     <switch x="15" y="579" height="40" on="false" variable="adaptive-therapy" width="195" display="adaptive-therapy"></switch>
@@ -235,6 +254,8 @@ Modeling tumor growth with adaptive therapy
 ## HOW IT WORKS
 
 Creates sensitive and resistant clone with given number of cells. Cells compete for space: a cell can divide (probability proliferationP-PRO for sensitive, proliferationP-DP for resistant cells) only into an empty neighboring patch. Every cell dies with probability deathP per tick (turnover), freeing space. The drug can be added into the environment metronomically, adaptively, or manually with a button.
+
+The initial tumor is a compact blob of cell-count cells at the center; PRO-to-DP is the fraction of sensitive cells. With initial-layout "clustered" (default) the resistant cells form one contiguous patch inside the blob, grown from a random seed cell; with "mixed" the two types are scattered at random.
 
 Cell types (patch colors):
  - Orange: drug-sensitive cells (PRO); killed on contact with a drug molecule
