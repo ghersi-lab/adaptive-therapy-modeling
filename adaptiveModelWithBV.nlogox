@@ -191,33 +191,26 @@ to replicate [col]
       ]
     ]
   ]
- ; else part for col= black
-  ; once penetrates into blood vessel, no need of invasion probability and it tries to proliferate there itself and don't cross the boundary again
-  ; how about starvation?
+  ; else part for col = black (resistant): the daughter may target an empty tissue patch (white)
+  ; or an uninvaded vessel patch (pink). A vessel patch is invaded with probability invasionP-DP;
+  ; invaded patches turn red and are counted in total-invasion. Red cells are not updated afterwards
+  ; (go skips vessel patches), so they neither divide nor starve.
   [
-    let nc count neighbors with [pcolor = white or pcolor = pink]
-    if nc > 0 [
-      ask one-of neighbors with [pcolor = white or pcolor = pink]
+    let target one-of neighbors with [pcolor = white or pcolor = pink]
+    if target != nobody [
+      ifelse [pcolor] of target = pink [
+        ifelse random-float 1 < invasionP-DP [
+          set total-invasion total-invasion + 1
+          ask target [ initiate-new red ]
+        ]
+        [
+          ; invasion failed: the daughter goes to a free tissue neighbor of the parent instead
+          let free one-of neighbors with [pcolor = white]
+          if free != nobody [ ask free [ initiate-new col ] ]
+        ]
+      ]
       [
-        ifelse pcolor = pink
-        [
-          ifelse random-float 1 < invasionP-DP
-          [
-            set total-invasion total-invasion + 1
-            initiate-new red
-          ]
-          [
-            let nw count neighbors with [pcolor = white]
-            if nw > 0
-            [
-              ask one-of neighbors with [pcolor = white] [ initiate-new col ]
-            ]
-          ]
-        ]
-        ;white
-        [
-            initiate-new col
-        ]
+        ask target [ initiate-new col ]
       ]
     ]
   ]
