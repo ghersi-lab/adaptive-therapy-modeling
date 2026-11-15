@@ -83,7 +83,6 @@ to go
   ; every 7th tick give bolus if tumor-burden is high
 
   ifelse adaptive-therapy [
-    set drugMolecule 0
     ; total tissue burden (sensitive + resistant, excluding cells that invaded the vessel) > burden threshold
     if c1count + c2count > adaptive-burden-threshold and ticks mod 7 = 0  and count drugts < max-drug [
       giveDrugs bolusAmount
