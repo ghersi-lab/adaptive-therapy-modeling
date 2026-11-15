@@ -5,15 +5,13 @@
 breed [ drugts drugt ]
 breed [ resourcets resourcet ]
 patches-own [ is-tumor? starved-for just-died? is-blood-vessel?]
-globals [tumor-burden tumor-burden-threshold bolusTick c1count c2count total-drug delta total-invasion invasionPResistant]
+globals [tumor-burden tumor-burden-threshold bolusTick c1count c2count total-drug total-invasion]
 
 
 to setup
   clear-all
   set total-invasion 0
-  set invasionPResistant 1 - proliferationP-DP
   ;let ccount 1
-  if cell-count = 0 [stop]
   ; size of the tumor growing space doesn't go smaller when blood vessel is added
   resize-world min-pxcor (max-pycor + blood-vessel-width)  min-pycor max-pycor
   let scount round ( cell-count * PRO-to-DP )
@@ -42,6 +40,9 @@ to setup
     set color green
     set size 1]
   ]
+
+  ; with no cells there is nothing to simulate; reset-ticks so that go stops cleanly instead of erroring
+  if cell-count = 0 [ reset-ticks stop ]
 
   ask patch 0 0 [
     set is-tumor? true
@@ -77,7 +78,6 @@ to go
   set tumor-burden count patches with [ is-tumor? ]
   set c1count count patches with [pcolor = orange]
   set c2count count patches with [pcolor = black]
-  set delta abs ( tumor-burden - adaptive-burden-threshold )
   if tumor-burden > tumor-burden-threshold or tumor-burden = 0 or total-invasion >= invasion-threshold [ stop ]
 
   ; every 7th tick give bolus if tumor-burden is high
@@ -284,6 +284,16 @@ Modeling tumor growth with adaptive therapy
 
 Creates sensitive and resistant clone with given number of cells. The cancer cells grow with the availability of resources and starvation time. The drug can be added into the environment metronomically, adaptively, or manually with a button.
 
+Cell types (patch colors):
+ - Orange: drug-sensitive cells (PRO); killed on contact with a drug molecule
+ - Black: drug-resistant cells (DP)
+ - Pink: blood vessel (right edge, width set by blood-vessel-width)
+ - Red: vessel patches invaded by resistant cells
+
+Only resistant cells can invade the vessel, with probability invasionP-DP per attempt. The run stops when total-invasion reaches invasion-threshold, when the tumor burden exceeds tumor-burden-threshold, or when the tumor is eliminated.
+
+In adaptive mode, a bolus of bolusAmount is given every 7 ticks while the tissue tumor burden (sensitive + resistant cells) exceeds adaptive-burden-threshold and fewer than max-drug drug molecules are present.
+
 ## HOW TO USE IT
 
 Click on Setup to erase the world and create a new world with given number of cell-counts.
@@ -295,8 +305,8 @@ Click on BOLUS to manually add drug
 ## THINGS TO NOTICE
 
 Note the growth represented in the adjoining graph. The plot reports the following
- - Resistant cell count (orange line)
- - Sensitive cell count (black line)
+ - Sensitive cell count (orange line, PROCount)
+ - Resistant cell count (black line, DPCount)
  - Number of resources  (green line) and 
  - Number of drug molecules (blue line)
 
